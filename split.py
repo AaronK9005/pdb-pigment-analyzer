@@ -5,9 +5,14 @@
 from chimerax.core.commands import run
 from chimerax.core.session import Session
 from pathlib import Path
+# import argparse
 
 # provided by ChimeraX when the script runs
 session: Session
+
+# parser = argparse.ArgumentParser()
+# parser.add_argument("data_dir")
+# parser.add_argument("--output", type=Path, default=(Path.cwd() / 'data' / 'output').resolve())
 
 base_dir = Path(__file__).resolve().parent.parent
 
