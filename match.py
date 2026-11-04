@@ -15,19 +15,30 @@ input_pdb_files = sorted( (base_dir / "data" / "filtered").glob('*.pdb') )
 output_pdb_folder = base_dir / "data" / "output"
 output_pdb_folder.mkdir(parents=True, exist_ok=True)
 
+rejected_pdb_foler = base_dir / 'data' / 'rejected'
+rejected_pdb_foler.mkdir(parents=True, exist_ok=True)
+
+log_dir = base_dir / 'data' / 'logs'
+log_dir.mkdir(parents=True, exist_ok=True)
+log_path = log_dir / 'match.log'
+log_path.unlink(missing_ok=True)
+
 # match_command = (
 #     f'mm #2 to #1'
 # )
 
-MIN_COVERAGE = 0.85
-MIN_CORE_RETENTION = 0.5
+MIN_COVERAGE = 0.1
+MIN_CORE_RETENTION = 0.1
 MAX_CORE_RMSD = 2.0
+MIN_CORE_PAIRS = 30
 
 counter: int = 1
+counter_rejected: int = 0
+counter_used: int = 0
 
-def log(text: str, log_level: str):
-    with open(base_dir / 'logs' / f'match.log') as log:
-        file.write_text(text)
+def log(log_level: str, text: str):
+    with log_path.open('a', encoding='utf-8') as file:
+        file.write(text)
 
     if hasattr(session.logger, log_level):
         method = getattr(session.logger, log_level)
@@ -74,9 +85,9 @@ try:
             )
 
             if len(candidate_models) != 1:
-                session.logger.warning(
+                log('warning',
                     f"Skipping {file.name}: expected one structure, "
-                    f"found {len(candidate_models)}"
+                    f"found {len(candidate_models)}\n"
                 )
                 continue
 
@@ -92,9 +103,7 @@ try:
             results = get_match_results(raw_result)
 
             if not results:
-                session.logger.warning(
-                    f"No usable match for {file.name}"
-                )
+                log('warning', f"No usable match for {file.name}\n")
                 continue
 
             result = results[0]
@@ -131,34 +140,48 @@ try:
                 paired_residues / match_length if match_length else 0.0
             )
 
-            session.logger.info(
-                f"{file.name}: "
-                f"core RMSD={core_rmsd:.2f} Å, "
-                f"full RMSD={full_rmsd:.2f} Å, "
-                f"core pairs={core_pairs}/{full_pairs}, "
-                f"coverage={ref_coverage:.1%}/{match_coverage:.1%}"
+            log('info',
+                f"{file.name}: \n"
+                f"\tcore RMSD={core_rmsd:.2f} Å, \n"
+                f"\tfull RMSD={full_rmsd:.2f} Å, \n"
+                f"\tcore pairs={core_pairs}/{full_pairs}, \n"
+                f"\tcoverage={ref_coverage:.1%}/{match_coverage:.1%}\n"
             )
 
             # Apply acceptance criteria.
-            if (
-                core_rmsd > MAX_CORE_RMSD
-                or ref_coverage < MIN_COVERAGE
-                or match_coverage < MIN_COVERAGE
-                or core_retention < MIN_CORE_RETENTION
-                or core_pairs < 30
-            ):
-                session.logger.info(f"Rejected: {file.name}")
-                continue
+            reject = True
+            reason = ''
 
-            output_file = output_pdb_folder / f"chain_{counter}.pdb"
+            if core_rmsd > MAX_CORE_RMSD:
+                reason = f"core_rmsd '{core_rmsd}' > MAX_CORE_RMSD '{MAX_CORE_RMSD}'"
+            elif ref_coverage < MIN_COVERAGE:
+                reason = f"ref_coverage '{ref_coverage}' < MIN_COVERAGE '{MIN_COVERAGE}'"
+            elif match_coverage < MIN_COVERAGE:
+                reason = f"match_coverage '{match_coverage}' < MIN_COVERAGE '{MIN_COVERAGE}'"
+            elif core_retention < MIN_CORE_RETENTION:
+                reason = f"core_retention '{core_retention}' < MIN_CORE_RETENTION '{MIN_CORE_RETENTION}'"
+            elif core_pairs < MIN_CORE_PAIRS:
+                reason = f"core_pairs '{core_pairs}' < MIN_CORE_PAIRS '{MIN_CORE_PAIRS}'"
+            else:
+                reject = False
+
+            output_file = base_dir / 'data'
+
+            if reject:
+                counter_rejected += 1
+                output_file /= 'rejected'
+                log('info', f"\tRejected: {file.name}, rejected_count: {counter_rejected}, reason: {reason}\n")
+            else:
+                counter_used += 1
+                output_file /= 'output'
+                log('info',f"\tAccepted: {file.name}\n")
+
+            output_file /= f'{file.name}'
 
             run(
                 session,
                 f'save "{output_file.as_posix()}" #{candidate_id}'
             )
-
-            session.logger.info(f"Accepted: {file.name}")
-            counter += 1
 
         finally:
             # Close only models opened for this candidate.
@@ -172,7 +195,7 @@ finally:
         if model in session.models.list():
             run(session, f"close #{model.id_string}")
 
-session.logger.info(f"Finished. Saved {counter - 1} structures.")
+log('info',f"Finished. Saved {counter_used} structures.\n")
 
 #* for file in input_pdb_files:
 #*     run(session, f'open "{file.as_posix()}"')

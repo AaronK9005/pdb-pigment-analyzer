@@ -50,9 +50,7 @@ for file in input_pdb_files:
                 run(session, f'select #{model_id}/{chain_id}')
 
                 # save as separate .pdb file
-                output_file = (
-                    output_pdb_folder / f'pdb_chain_{counter}.pdb'
-                )
+                output_file = output_pdb_folder / f'{counter:02d}_{file.stem}-{chain_id}.pdb'
 
                 run(
                     session,
