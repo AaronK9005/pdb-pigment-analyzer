@@ -13,7 +13,6 @@ script_dir = Path(__file__).resolve().parent
 # close all to not interfere with hardcoded #2 in match.py
 run(session, 'close')
 
-# ! only commented for testing match.py
 run(session, f'runscript "{script_dir.as_posix()}/split.py"')
 run(session, f'runscript "{script_dir.as_posix()}/filter.py"')
 run(session, f'runscript "{script_dir.as_posix()}/match.py"')
