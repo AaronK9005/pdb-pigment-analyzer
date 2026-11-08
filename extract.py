@@ -34,10 +34,10 @@ def log(log_level: str, text: str):
         method(text.strip())
 
 class vec3:
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, x: float, y: float, z: float):
+        self.x: float = x
+        self.y: float = y
+        self.z: float = z
 
     def __iter__(self):
         return iter((self.x, self.y, self.z))
@@ -68,27 +68,27 @@ class vec3:
     def sum_sq(self) -> float:
         return self.x ** 2 + self.y ** 2 + self.z ** 2
 
-    def dist(self, value) -> float:
-        return (self - value).sum_sq() ** 0.5
+    def dist(self, other) -> float:
+        return (self - other).sum_sq() ** 0.5
 
 class Pigment:
-    def __init__(self, pos, file, residue):
-        self.pos = pos
-        self.file = file
-        self.residue = residue
+    def __init__(self, pos: vec3, filename: str, residue: str):
+        self.pos: vec3 = pos
+        self.filename: str = filename
+        self.residue: str = residue
 
-    def __str__(self):
-        return (
-            f'processed: {self.file.stem.split('_')[0]}\n'
-            f'file: {self.file.name}\n'
-            f'residue: {self.residue}\n'
-        )
+    # def __str__(self):
+    #     return (
+    #         f'processed: {self.file.split("_")[0]}\n'
+    #         f'file: {self.file.name}\n'
+    #         f'residue: {self.residue}\n'
+    #     )
 
 class center:
-    def __init__(self, pigment):
-        self.pos = pigment.pos # vec3
-        self.pigments = [pigment] # list of vec3's
-        self.farthest = 0.0 # float
+    def __init__(self, pigment: Pigment):
+        self.pos: vec3 = pigment.pos
+        self.pigments: list[Pigment] = [pigment]
+        self.farthest: float = 0.0
 
     def __str__(self):
         return f'center: pos = {self.pos}, number of pigments = {len(self.pigments)}'
@@ -96,11 +96,11 @@ class center:
     def __repr__(self):
         return f'center: pos = {self.pos}, pigments: {self.pigments}'
 
-    def add_pigment(self, pigment_pos: vec3):
-        self.pigments.append(pigment_pos)
-        self.pos = sum(self.pigments, vec3(0.0, 0.0, 0.0)) / len(self.pigments)
+    def add_pigment(self, pigment: Pigment):
+        self.pigments.append(pigment)
+        self.pos = sum((pigment_.pos for pigment_ in self.pigments), vec3(0.0, 0.0, 0.0)) / len(self.pigments)
         self.farthest = max(
-            (self.pos.dist(pigment) for pigment in self.pigments),
+            (self.pos.dist(pigment_.pos) for pigment_ in self.pigments),
             default = 0.0
         )
 
@@ -126,21 +126,26 @@ with map_file.open('w', encoding='utf-8') as out_pdb_file:
                 if line[76:78].strip().upper()!= 'MG':
                     continue
 
-                if line[17:20].strip().upper() not in pigments:
+                residue = line[17:20].strip().upper()
+                if residue not in pigments:
                     continue
 
                 line = f'{line[:6]}{serial:5d}{line[11:]}'
                 out_pdb_file.write(line)
 
-                pigment = vec3(
-                    float(line[30:38]),
-                    float(line[38:46]),
-                    float(line[46:54])
-                )
+                pigment = Pigment(
+                    vec3(
+                        float(line[30:38]),
+                        float(line[38:46]),
+                        float(line[46:54])
+                        ),
+                    pdb_path.name,
+                    residue
+                    )
 
                 placed = False
                 for cent in pigm_centers:
-                    if cent.pos.dist(pigment) < MAX_MG_DISPERSION:
+                    if cent.pos.dist(pigment.pos) < MAX_MG_DISPERSION:
                         cent.add_pigment(pigment)
                         placed = True
                         break
@@ -180,5 +185,13 @@ for i in range(len(pigm_centers)):
         f',\tfarthest = {pigm_centers[i].farthest:.3f}'
         f',\tnumber of pigments = {len(pigm_centers[i].pigments)}'
         '\n')
+    for index, pigment in enumerate(pigm_centers[i].pigments):
+        log('info',
+            f'\t\t\t\tpigment {index}:'
+            f'\tpos = {pigment.pos}'
+            f'\tfile = \'{pigment.filename}\''
+            f'\tresidue = \'{pigment.residue}\''
+            f'\n'
+            )
     # render_ball(session, pigm_centers[i].pos, pigm_centers[i].farthest, f's{i+1}')
 log('info', f'Found {len(pigm_centers)} pigment centers:\n')
