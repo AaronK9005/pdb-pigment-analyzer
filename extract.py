@@ -220,12 +220,12 @@ for i, p_center in enumerate(pigm_centers):
     )
 
     log('info',
-        f'\t{str(formated_compositions)}\n'
+        f'\t\t{str(formated_compositions)}\n'
         )
     
     for index, pigment in enumerate(p_center.pigments):
         log('info',
-            f'\t\tpigment {index}:'
+            f'\t\t\tpigment {index}:'
             f'\tpos = {pigment.pos:6.2f}'
             f'\tfile = \'{pigment.filename}\''
             f'\tresidue = \'{pigment.residue}\''
