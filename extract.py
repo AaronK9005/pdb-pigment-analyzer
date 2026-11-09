@@ -51,7 +51,7 @@ class vec3:
     # def __str__(self):
     #     return f'({self.x}, {self.y}, {self.z})'
     def __format__(self, format_spec):
-        return f'({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
+        return f'({self.x:{format_spec}}, {self.y:{format_spec}}, {self.z:{format_spec}})'
 
     def __repr__(self):
         return f'vec3({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
@@ -103,6 +103,32 @@ class center:
             (self.pos.dist(pigment_.pos) for pigment_ in self.pigments),
             default = 0.0
         )
+
+    # def get_pigment_composition(self, pigment_names: set[str]) -> dict[str, float]:
+    #     pigment_counter: dict[str, float] = {pigm: 0.0 for pigm in pigment_names}
+
+    #     for pigment in self.pigments:
+    #         if pigment.residue in pigment_counter:
+    #             pigment_counter[pigment.residue] += 1.0
+
+    #     LEN = len(self.pigments)
+    #     for value in pigment_counter.values():
+    #         value /= LEN
+
+    #     return pigment_counter
+    def get_pigment_composition(self) -> dict[str, float]:
+        pigment_counter: dict[str, float] = {}
+
+        for pigment in self.pigments:
+            pigment_counter[pigment.residue] = (
+                pigment_counter.get(pigment.residue, 0) + 1
+            )
+
+        total = len(self.pigments)
+        for pigment_name in pigment_counter:
+            pigment_counter[pigment_name] /= total
+
+        return pigment_counter
 
 # centers for pigments (mg clusters)
 pigm_centers: list[center] = []
@@ -179,16 +205,28 @@ def render_ball(session, position: vec3, radius, name = 'sphere', color = 'red')
 
 # log and render spheres
 log('info', f'Found {len(pigm_centers)} pigment centers:\n')
-for i in range(len(pigm_centers)):
+for i, p_center in enumerate(pigm_centers):
     log('info',
-        f'\t{i + 1:6d}: pos = {pigm_centers[i].pos}'
-        f',\tfarthest = {pigm_centers[i].farthest:.3f}'
-        f',\tnumber of pigments = {len(pigm_centers[i].pigments)}'
+        f'{i + 1:6d}: pos = {p_center.pos:.3f}'
+        f',\tfarthest = {p_center.farthest:.3f}'
+        f',\tnumber of pigments = {len(p_center.pigments)}'
         '\n')
-    for index, pigment in enumerate(pigm_centers[i].pigments):
+
+    formated_compositions = ', '.join(
+        f'{name}: {value:.2%}' for name, value in sorted(
+            p_center.get_pigment_composition().items(),
+            key = lambda x: x[1], reverse = True
+        )
+    )
+
+    log('info',
+        f'\t{str(formated_compositions)}\n'
+        )
+    
+    for index, pigment in enumerate(p_center.pigments):
         log('info',
-            f'\t\t\t\tpigment {index}:'
-            f'\tpos = {pigment.pos}'
+            f'\t\tpigment {index}:'
+            f'\tpos = {pigment.pos:6.2f}'
             f'\tfile = \'{pigment.filename}\''
             f'\tresidue = \'{pigment.residue}\''
             f'\n'
